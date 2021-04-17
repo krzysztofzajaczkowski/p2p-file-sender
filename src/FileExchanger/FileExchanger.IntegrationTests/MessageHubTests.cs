@@ -31,5 +31,32 @@ namespace FileExchanger.IntegrationTests
                 .Build();
         }
 
+        [Fact]
+        public async Task Message_hub_should_reply_with_the_same_message_when_client_invoke_send_message_to_all_method()
+        {
+            // Arrange
+            var messageReceivedEvent = new ManualResetEvent(false);
+            const string message = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur interdum quis enim a maximus.";
+            var receivedMessage = string.Empty;
+
+            var server = BuildTestServer();
+            var client = BuildHubConnection(server);
+
+            client.On<string>("ReceiveSendMessageToAll", msg =>
+            {
+                receivedMessage = msg;
+                messageReceivedEvent.Set();
+            });
+
+            // Act
+            await client.StartAsync();
+            await client.InvokeAsync("SendMessageToAll", message);
+
+            messageReceivedEvent.WaitOne();
+
+            // Assert
+            receivedMessage.Should().Be(message);
+        }
+
     }
 }
