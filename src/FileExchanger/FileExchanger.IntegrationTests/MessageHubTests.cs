@@ -58,5 +58,30 @@ namespace FileExchanger.IntegrationTests
             receivedMessage.Should().Be(message);
         }
 
+        [Fact]
+        public async Task Message_hub_should_reply_false_when_client_invoke_check_if_im_host_method()
+        {
+            // Arrange
+            var messageReceivedEvent = new ManualResetEvent(false);
+            bool? isHost = null;
+            var server = BuildTestServer();
+            var client = BuildHubConnection(server);
+
+            client.On<bool>("ReceiveCheckIfImHost", msg =>
+            {
+                isHost = msg;
+                messageReceivedEvent.Set();
+            });
+
+            // Act
+            await client.StartAsync();
+            await client.InvokeAsync("CheckIfImHost");
+
+            messageReceivedEvent.WaitOne();
+
+            // Assert
+            isHost.Should().BeFalse();
+        }
+
     }
 }
