@@ -9,6 +9,8 @@ namespace FileExchanger.Hubs
     public class MessageHub : Hub
     {
         private static string _hostId;
+        private IClientProxy Host => Clients.Client(_hostId);
+        private IClientProxy Caller => Clients.Caller;
 
         public Task SendMessageToAll(string message)
         {
@@ -29,6 +31,22 @@ namespace FileExchanger.Hubs
         public Task SendMessage(string message)
         {
             return Clients.Client(_hostId).SendAsync("ReceiveSendMessage", message);
+        }
+
+        public Task StartSending(int numberOfPackages, string fileName)
+        {
+            return Host.SendAsync("ReceiveStartSending", numberOfPackages, fileName);
+        }
+
+        public async Task SendPackage(int packageNumber, byte[] data)
+        {
+            await Caller.SendAsync("ReceiveProgress", packageNumber);
+            await Host.SendAsync("ReceiveSendPackage", packageNumber, data);
+        }
+
+        public Task StopSending()
+        {
+            return Host.SendAsync("ReceiveStopSending");
         }
     }
 }
