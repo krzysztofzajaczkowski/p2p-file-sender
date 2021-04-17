@@ -19,5 +19,11 @@ namespace FileExchanger.Hubs
         {
             return Clients.Caller.SendAsync("ReceiveCheckIfImHost", Context.ConnectionId == _hostId);
         }
+
+        public Task ConnectAsHost()
+        {
+            _hostId = Context.ConnectionId;
+            return Clients.Caller.SendAsync("ReceiveConnectAsHost", true);
+        }
     }
 }
