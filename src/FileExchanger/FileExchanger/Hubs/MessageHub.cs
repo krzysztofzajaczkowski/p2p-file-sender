@@ -25,5 +25,10 @@ namespace FileExchanger.Hubs
             _hostId = Context.ConnectionId;
             return Clients.Caller.SendAsync("ReceiveConnectAsHost", true);
         }
+
+        public Task SendMessage(string message)
+        {
+            return Clients.Client(_hostId).SendAsync("ReceiveSendMessage", message);
+        }
     }
 }

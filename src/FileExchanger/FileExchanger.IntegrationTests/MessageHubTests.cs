@@ -151,5 +151,46 @@ namespace FileExchanger.IntegrationTests
             isFirstClientHost.Should().BeTrue();
             isSecondClientHost.Should().BeFalse();
         }
+
+        [Fact]
+        public async Task First_client_should_receive_message_from_second_client_when_invoke_send_message_method()
+        {
+            // Arrange
+            var message = "Test message from 2nd client";
+            var receivedMessage = string.Empty;
+            bool? firstClientIsHost = null;
+            var firstClientConnectedAsHostEvent = new ManualResetEvent(false);
+            var firstClientReceivedMessageEvent = new ManualResetEvent(false);
+
+            var server = BuildTestServer();
+            var firstConnection = BuildHubConnection(server);
+            var secondConnection = BuildHubConnection(server);
+
+            firstConnection.On<bool>("ReceiveConnectAsHost", msg =>
+            {
+                firstClientIsHost = true;
+                firstClientConnectedAsHostEvent.Set();
+            });
+
+            firstConnection.On<string>("ReceiveSendMessage", msg =>
+            {
+                receivedMessage = msg;
+                firstClientReceivedMessageEvent.Set();
+            });
+
+            // Act
+            await firstConnection.StartAsync();
+            await secondConnection.StartAsync();
+
+            await firstConnection.SendAsync("ConnectAsHost");
+            firstClientConnectedAsHostEvent.WaitOne();
+
+            await secondConnection.SendAsync("SendMessage", message);
+            firstClientReceivedMessageEvent.WaitOne();
+
+            // Assert
+            firstClientIsHost.Should().BeTrue();
+            receivedMessage.Should().Be(message);
+        }
     }
 }
