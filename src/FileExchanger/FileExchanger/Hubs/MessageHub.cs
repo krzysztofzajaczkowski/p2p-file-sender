@@ -8,9 +8,16 @@ namespace FileExchanger.Hubs
 {
     public class MessageHub : Hub
     {
+        private static string _hostId;
+
         public Task SendMessageToAll(string message)
         {
             return Clients.All.SendAsync("ReceiveSendMessageToAll", message);
+        }
+
+        public Task CheckIfImHost()
+        {
+            return Clients.Caller.SendAsync("ReceiveCheckIfImHost", Context.ConnectionId == _hostId);
         }
     }
 }
