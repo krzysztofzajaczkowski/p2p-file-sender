@@ -22,7 +22,7 @@ h3 {
   font-weight: 450;
   text-transform: uppercase;
   display: inline-block;
-  margin: 40px 8px 10px 8px;
+  margin: 20px 0 10px 0;
   color: #0d0d0d;
 }
 
@@ -39,6 +39,7 @@ h3 {
 
 .main {
   border-radius: 10px 10px 10px 10px;
+  margin: 0 5%;
   background: #fff;
   width: 90%;
   max-width: 450px;
@@ -49,7 +50,7 @@ h3 {
 }
 
 input[type="button"],
-input[type="submit"] {
+input[type="submit"]{
   background-color: #ee5253;
   border: none;
   color: white;
@@ -63,9 +64,26 @@ input[type="submit"] {
   margin: 5px 20px 20px 20px;
 }
 
+input[type="file"] {
+  background-color: #ee5253;
+  border: none;
+  color: white;
+  padding: 15px 40px;
+  text-align: center;
+  display: inline-block;
+  box-shadow: 0 10px 30px 0 hsla(0, 76%, 64%, 0.4);
+  border-radius: 5px;
+  margin: 5px 20px 5px 20px;
+}
+
 input[type="button"]:active,
-input[type="submit"]:active {
+input[type="submit"]:active,
+input[type="file"]:active {
   transform: scale(0.9);
+}
+
+input[type="button"]:disabled{
+  background-color: rgba(238, 82, 83, 0.2);
 }
 
 input[type="text"],
@@ -85,6 +103,10 @@ input[type="password"] {
 input[type="text"]::placeholder,
 input[type="password"]::placeholder {
   color: #cccccc;
+}
+
+mat-progress-bar {
+  margin-bottom: 20px;
 }
 
 * {

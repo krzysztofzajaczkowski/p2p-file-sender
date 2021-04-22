@@ -14,7 +14,7 @@ export class HomeComponent {
 
   login() {
     if (this.password) {
-      this.router.navigate(['/counter'])
+      this.router.navigate(['/menu'])
         .then(() => console.log('Navigated to counter'));
     } else {
       this._snackBar.open('Log in failed...', 'Close', {

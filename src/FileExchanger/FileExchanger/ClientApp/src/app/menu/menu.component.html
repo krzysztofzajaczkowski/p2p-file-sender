@@ -1,0 +1,8 @@
+<div class="main">
+  <h2>BSK Project</h2><br/>
+  <form>
+    <input type="button" value="Send file" [routerLink]="['/file-sender']"/>
+    <input type="button" value="Send message" [routerLink]="['/message-sender']"/>
+    <input type="button" value="Generate session key" (click)="generateSessionKey()"/>
+  </form>
+</div>
