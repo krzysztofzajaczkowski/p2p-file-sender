@@ -1,8 +1,17 @@
+using System.Runtime.InteropServices;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
 using FileExchanger.Hubs;
+using FileExchanger.Services.ConnectionStore;
+using FileExchanger.Services.DummyData;
+using FileExchanger.Services.Encryptor;
+using FileExchanger.Services.FileManager;
+using FileExchanger.Services.JavaScriptInterop;
+using FileExchanger.Services.KeyStore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SpaServices.AngularCli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,17 +31,43 @@ namespace FileExchanger
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddNodeServices();
+            services.AddSingleton<JavaScriptInteropService>();
+
+            services.AddSingleton<IKeyStore, DirectoryKeyStore>();
+            //services.AddSingleton<IConnectionStore, InMemoryConnectionStore>();
+            services.AddSingleton<IDummyDataService, DummyDataService>();
+            services.AddSingleton<IKeyStore, InMemoryKeyStore>();
+            services.AddSingleton<IFileManager, DirectoryFileManager>();
+            //services.AddSingleton<IFileManager, InMemoryFileManager>();
+            services.AddSingleton<IEncryptorService, EncryptorService>();
+
             services.AddCors(o => o.AddPolicy("AllPolicy", b =>
             {
                 b.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
             }));
-            services.AddSignalR();
+
+            services.AddSignalR(o =>
+            {
+                o.EnableDetailedErrors = true;
+                o.MaximumReceiveMessageSize = null;
+            });
+
+            services.Configure<FormOptions>(o =>
+            {
+                o.ValueLengthLimit = int.MaxValue;
+                o.MultipartBodyLengthLimit = int.MaxValue;
+                o.MemoryBufferThreshold = int.MaxValue;
+            });
+
+            
 
             services.AddControllersWithViews();
             // In production, the Angular files will be served from this directory
             services.AddSpaStaticFiles(configuration =>
             {
                 configuration.RootPath = "ClientApp/dist";
+
             });
         }
 
@@ -49,11 +84,11 @@ namespace FileExchanger
                 app.UseExceptionHandler("/Error");
             }
 
-            app.UseStaticFiles();
-            if (!env.IsDevelopment())
-            {
-                app.UseSpaStaticFiles();
-            }
+            //app.UseStaticFiles();
+            //if (!env.IsDevelopment())
+            //{
+            //    app.UseSpaStaticFiles();
+            //}
 
             app.UseRouting();
 
@@ -74,7 +109,7 @@ namespace FileExchanger
                 // To learn more about options for serving an Angular SPA from ASP.NET Core,
                 // see https://go.microsoft.com/fwlink/?linkid=864501
 
-                spa.Options.SourcePath = "ClientApp";
+                spa.Options.SourcePath = env.ContentRootPath + "ClientApp";
 
                 if (env.IsDevelopment())
                 {
@@ -95,7 +130,6 @@ namespace FileExchanger
                 mainWindow.Show();
             };
             mainWindow.SetTitle("App Name here");
-
             MenuItem[] menu = new MenuItem[]
             {
                 new MenuItem
