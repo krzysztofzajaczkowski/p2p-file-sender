@@ -1,16 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
+using FileExchanger.Models;
+using FileExchanger.Services.ConnectionStore;
+using FileExchanger.Services.Encryptor;
+using FileExchanger.Services.FileManager;
 using Microsoft.AspNetCore.SignalR;
 
 namespace FileExchanger.Hubs
 {
     public class MessageHub : Hub
     {
-        private static string _hostId;
-        private IClientProxy Host => Clients.Client(_hostId);
+        private readonly IEncryptorService _encryptorService;
+        private readonly IFileManager _fileManager;
+        private readonly IConnectionStore _connectionStore;
+        private IClientProxy Host => Clients.Client(_connectionStore.HostId);
         private IClientProxy Caller => Clients.Caller;
+
+        public MessageHub(IEncryptorService encryptorService, IFileManager fileManager, IConnectionStore connectionStore)
+        {
+            _encryptorService = encryptorService;
+            _fileManager = fileManager;
+            _connectionStore = connectionStore;
+
+        }
 
         public Task SendMessageToAll(string message)
         {
@@ -19,34 +34,70 @@ namespace FileExchanger.Hubs
 
         public Task CheckIfImHost()
         {
-            return Clients.Caller.SendAsync("ReceiveCheckIfImHost", Context.ConnectionId == _hostId);
+            return Clients.Caller.SendAsync("ReceiveCheckIfImHost", Context.ConnectionId == _connectionStore.HostId);
         }
 
-        public Task ConnectAsHost()
+        public async Task ConnectAsHost()
         {
-            _hostId = Context.ConnectionId;
-            return Clients.Caller.SendAsync("ReceiveConnectAsHost", true);
+            _connectionStore.SetHostId(Context.ConnectionId);
+            await Clients.Caller.SendAsync("ReceiveConnectAsHost", true);
         }
 
         public Task SendMessage(string message)
         {
-            return Clients.Client(_hostId).SendAsync("ReceiveSendMessage", message);
+            return Clients.Client(_connectionStore.HostId).SendAsync("ReceiveSendMessage", message);
         }
 
-        public Task StartSending(int numberOfPackages, string fileName)
+        public async Task SendReceiverPublicKey(string key)
         {
-            return Host.SendAsync("ReceiveStartSending", numberOfPackages, fileName);
+            _encryptorService.SetReceiverPublicKey(key);
+            await Caller.SendAsync("ReceiveSendReceiverPublicKey", true);
+            await Host.SendAsync("ReceiveSendReceiverPublicKey", true);
+
         }
 
-        public async Task SendPackage(int packageNumber, byte[] data)
+        public Task SendEncryptedSessionKey(string key)
         {
-            await Caller.SendAsync("ReceiveProgress", packageNumber);
-            await Host.SendAsync("ReceiveSendPackage", packageNumber, data);
+            var decryptedKey = _encryptorService.DecryptSessionKeyWithRsa(key);
+            _encryptorService.SetSessionKey(decryptedKey.ToList());
+            return Task.WhenAll(
+                Host.SendAsync("ReceiveSendEncryptedSessionKey"),
+                Caller.SendAsync("ReceiveSendEncryptedSessionKey")
+            );
         }
 
-        public Task StopSending()
+        public Task StartSendingMessage(List<Guid> packageIds, int numberOfPackages, CipherMode cipherMode, int blockSize)
         {
-            return Host.SendAsync("ReceiveStopSending");
+            _encryptorService.AddPackageIds(packageIds);
+            _encryptorService.SetDataOptions(cipherMode, blockSize);
+            return Host.SendAsync("ReceiveStartSendingMessage", packageIds, numberOfPackages);
         }
+
+        public async Task SendPackage(Package package)
+        {
+            await Caller.SendAsync("ReceiveProgress", package.Number);
+            _encryptorService.AddPackage(package);
+        }
+
+        public async Task StopSendingMessage()
+        {
+            var message = await _encryptorService.GetMessageFromPackagesAsync();
+            await Host.SendAsync("ReceiveStopSendingMessage", message);
+        }
+
+        public Task StartSendingFile(List<Guid> packageIds, int numberOfPackages, CipherMode cipherMode, int blockSize)
+        {
+            _encryptorService.AddPackageIds(packageIds);
+            _encryptorService.SetDataOptions(cipherMode, blockSize);
+            return Host.SendAsync("ReceiveStartSendingFile", packageIds, numberOfPackages);
+        }
+
+        public async Task StopSendingFile(string fileName)
+        {
+            var bytes = await _encryptorService.GetBytesFromPackagesAsync();
+            _fileManager.SaveFile(bytes, fileName);
+            await Host.SendAsync("ReceiveStopSendingFile", fileName);
+        }
+
     }
 }
