@@ -31,13 +31,10 @@ namespace FileExchanger
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddNodeServices();
-            services.AddSingleton<JavaScriptInteropService>();
-
             services.AddSingleton<IKeyStore, DirectoryKeyStore>();
-            //services.AddSingleton<IConnectionStore, InMemoryConnectionStore>();
+            //services.AddSingleton<IKeyStore, InMemoryKeyStore>();
+            services.AddSingleton<IConnectionStore, InMemoryConnectionStore>();
             services.AddSingleton<IDummyDataService, DummyDataService>();
-            services.AddSingleton<IKeyStore, InMemoryKeyStore>();
             services.AddSingleton<IFileManager, DirectoryFileManager>();
             //services.AddSingleton<IFileManager, InMemoryFileManager>();
             services.AddSingleton<IEncryptorService, EncryptorService>();
@@ -60,7 +57,9 @@ namespace FileExchanger
                 o.MemoryBufferThreshold = int.MaxValue;
             });
 
-            
+            services.AddNodeServices();
+
+            services.AddSingleton<JavaScriptInteropService>();
 
             services.AddControllersWithViews();
             // In production, the Angular files will be served from this directory
