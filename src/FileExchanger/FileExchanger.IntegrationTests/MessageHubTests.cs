@@ -1120,10 +1120,10 @@ namespace FileExchanger.IntegrationTests
         [InlineData(CipherMode.CBC)]
         [InlineData(CipherMode.CFB)]
         [InlineData(CipherMode.OFB)]
-        public async Task Sending50MBFile_WhenClientsExchangedKeys_SecondClientShouldReceiveCorrectFile(CipherMode cipherMode)
+        public async Task Sending1MBFile_WhenClientsExchangedKeys_FirstClientShouldReceiveCorrectFile(CipherMode cipherMode)
         {
             // Arrange
-            var originalBytes = new byte[1024 * 1024 * 50];
+            var originalBytes = new byte[1024 * 1024];
             new Random().NextBytes(originalBytes);
             var fileName = "testFile.txt";
             var receivedFileName = string.Empty;
@@ -1135,7 +1135,7 @@ namespace FileExchanger.IntegrationTests
             }, "secondServer");
             _secondServer = secondServer;
 
-            var fileManager = secondServer.Services.GetRequiredService<IFileManager>();
+            var fileManager = firstServer.Services.GetRequiredService<IFileManager>();
             var firstClient = await SetupConnectionsForBothServersAsync(firstServer, secondServer);
             var firstClientPassword = "firstClientPassword";
             var firstClientResetEvent = new ManualResetEvent(false);
@@ -1146,6 +1146,11 @@ namespace FileExchanger.IntegrationTests
             });
             firstClient.clientConnection.On("ReceiveSendEncryptedSessionKey", () =>
             {
+                firstClientResetEvent.Set();
+            });
+            firstClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
                 firstClientResetEvent.Set();
             });
 
@@ -1161,11 +1166,7 @@ namespace FileExchanger.IntegrationTests
             {
                 secondClientResetEvent.Set();
             });
-            secondClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
-            {
-                receivedFileName = fileName;
-                secondClientResetEvent.Set();
-            });
+            
 
             // Act
             await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
@@ -1189,23 +1190,23 @@ namespace FileExchanger.IntegrationTests
             using var formData = new MultipartFormDataContent();
             formData.Add(content1, "files", "name");
             formData.Add(new StringContent(cipherMode.ToString()), "mode");
-            response = await firstClient.httpClient.PostAsync("api/exchange/packageFile", formData);
+
+            response = await secondClient.httpClient.PostAsync("api/exchange/packageFile", formData);
             var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
-            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile), packages.Select(p => p.Id).ToList(),
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile), packages.Select(p => p.Id).ToList(),
             packages.Count, cipherMode, 128);
-            for (int i = 0; i < packages.Count; ++i)
+            foreach (var package in packages)
             {
-                await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), packages[i]);
+                await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), package);
             }
 
-            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileName);
-            secondClientResetEvent.WaitOne();
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileName);
+            firstClientResetEvent.WaitOne();
 
             // Assert
             var receivedBytes = fileManager.GetFile(receivedFileName);
             receivedFileName.Should().Be(fileName);
             receivedBytes.Should().Equal(originalBytes);
-
 
         }
 
@@ -1300,6 +1301,290 @@ namespace FileExchanger.IntegrationTests
             receivedFileName.Should().Be(fileName);
             receivedBytes.Should().Equal(originalBytes);
 
+
+        }
+
+        [Theory]
+        [InlineData(CipherMode.ECB)]
+        [InlineData(CipherMode.CBC)]
+        [InlineData(CipherMode.CFB)]
+        [InlineData(CipherMode.OFB)]
+        public async Task Sending10MBFile_WhenClientsExchangedKeys_FirstClientShouldReceiveCorrectFile(CipherMode cipherMode)
+        {
+            // Arrange
+            var originalBytes = new byte[1024 * 1024 * 10];
+            new Random().NextBytes(originalBytes);
+            var fileName = "testFile.txt";
+            var receivedFileName = string.Empty;
+            var firstServer = BuildTestServer(clientName: "firstServer");
+            _firstServer = firstServer;
+            var secondServer = BuildTestServer(builder =>
+            {
+                builder.UseUrls("http://localhost:24555", "https://localhost:24556");
+            }, "secondServer");
+            _secondServer = secondServer;
+
+            var fileManager = firstServer.Services.GetRequiredService<IFileManager>();
+            var firstClient = await SetupConnectionsForBothServersAsync(firstServer, secondServer);
+            var firstClientPassword = "firstClientPassword";
+            var firstClientResetEvent = new ManualResetEvent(false);
+            var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
+            firstClient.hostConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                firstClientResetEvent.Set();
+            });
+            firstClient.clientConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                firstClientResetEvent.Set();
+            });
+            firstClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
+                firstClientResetEvent.Set();
+            });
+
+            var secondClient = await SetupConnectionsForBothServersAsync(secondServer, firstServer);
+            var secondClientPassword = "secondClientPassword";
+            var secondClientResetEvent = new ManualResetEvent(false);
+            var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
+            secondClient.clientConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                secondClientResetEvent.Set();
+            });
+            secondClient.hostConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                secondClientResetEvent.Set();
+            });
+
+
+            // Act
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            var response = await firstClient.httpClient.GetAsync("api/exchange/key");
+            var sessionKeyEncryptedWithPublicKey = await response.Content.ReadAsStringAsync();
+
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendEncryptedSessionKey),
+                sessionKeyEncryptedWithPublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            await using var file1 = new MemoryStream(originalBytes);
+            using var content1 = new StreamContent(file1);
+            using var formData = new MultipartFormDataContent();
+            formData.Add(content1, "files", "name");
+            formData.Add(new StringContent(cipherMode.ToString()), "mode");
+
+            response = await secondClient.httpClient.PostAsync("api/exchange/packageFile", formData);
+            var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile), packages.Select(p => p.Id).ToList(),
+            packages.Count, cipherMode, 128);
+            foreach (var package in packages)
+            {
+                await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), package);
+            }
+
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileName);
+            firstClientResetEvent.WaitOne();
+
+            // Assert
+            var receivedBytes = fileManager.GetFile(receivedFileName);
+            receivedFileName.Should().Be(fileName);
+            receivedBytes.Should().Equal(originalBytes);
+
+        }
+
+        [Theory]
+        [InlineData(CipherMode.ECB)]
+        [InlineData(CipherMode.CBC)]
+        [InlineData(CipherMode.CFB)]
+        [InlineData(CipherMode.OFB)]
+        public async Task Sending50MBFile_WhenClientsExchangedKeys_SecondClientShouldReceiveCorrectFile(CipherMode cipherMode)
+        {
+            // Arrange
+            var originalBytes = new byte[1024 * 1024 * 50];
+            new Random().NextBytes(originalBytes);
+            var fileName = "testFile.txt";
+            var receivedFileName = string.Empty;
+            var firstServer = BuildTestServer(clientName: "firstServer");
+            _firstServer = firstServer;
+            var secondServer = BuildTestServer(builder =>
+            {
+                builder.UseUrls("http://localhost:24555", "https://localhost:24556");
+            }, "secondServer");
+            _secondServer = secondServer;
+
+            var fileManager = secondServer.Services.GetRequiredService<IFileManager>();
+            var firstClient = await SetupConnectionsForBothServersAsync(firstServer, secondServer);
+            var firstClientPassword = "firstClientPassword";
+            var firstClientResetEvent = new ManualResetEvent(false);
+            var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
+            firstClient.hostConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                firstClientResetEvent.Set();
+            });
+            firstClient.clientConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                firstClientResetEvent.Set();
+            });
+
+            var secondClient = await SetupConnectionsForBothServersAsync(secondServer, firstServer);
+            var secondClientPassword = "secondClientPassword";
+            var secondClientResetEvent = new ManualResetEvent(false);
+            var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
+            secondClient.clientConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                secondClientResetEvent.Set();
+            });
+            secondClient.hostConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                secondClientResetEvent.Set();
+            });
+            secondClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
+                secondClientResetEvent.Set();
+            });
+
+            // Act
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            var response = await firstClient.httpClient.GetAsync("api/exchange/key");
+            var sessionKeyEncryptedWithPublicKey = await response.Content.ReadAsStringAsync();
+
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendEncryptedSessionKey),
+                sessionKeyEncryptedWithPublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            await using var file1 = new MemoryStream(originalBytes);
+            using var content1 = new StreamContent(file1);
+            using var formData = new MultipartFormDataContent();
+            formData.Add(content1, "files", "name");
+            formData.Add(new StringContent(cipherMode.ToString()), "mode");
+            response = await firstClient.httpClient.PostAsync("api/exchange/packageFile", formData);
+            var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile), packages.Select(p => p.Id).ToList(),
+            packages.Count, cipherMode, 128);
+            for (int i = 0; i < packages.Count; ++i)
+            {
+                await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), packages[i]);
+            }
+
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileName);
+            secondClientResetEvent.WaitOne();
+
+            // Assert
+            var receivedBytes = fileManager.GetFile(receivedFileName);
+            receivedFileName.Should().Be(fileName);
+            receivedBytes.Should().Equal(originalBytes);
+
+
+        }
+
+        [Theory]
+        [InlineData(CipherMode.ECB)]
+        [InlineData(CipherMode.CBC)]
+        [InlineData(CipherMode.CFB)]
+        [InlineData(CipherMode.OFB)]
+        public async Task Sending50MBFile_WhenClientsExchangedKeys_FirstClientShouldReceiveCorrectFile(CipherMode cipherMode)
+        {
+            // Arrange
+            var originalBytes = new byte[1024 * 1024 * 50];
+            new Random().NextBytes(originalBytes);
+            var fileName = "testFile.txt";
+            var receivedFileName = string.Empty;
+            var firstServer = BuildTestServer(clientName: "firstServer");
+            _firstServer = firstServer;
+            var secondServer = BuildTestServer(builder =>
+            {
+                builder.UseUrls("http://localhost:24555", "https://localhost:24556");
+            }, "secondServer");
+            _secondServer = secondServer;
+
+            var fileManager = firstServer.Services.GetRequiredService<IFileManager>();
+            var firstClient = await SetupConnectionsForBothServersAsync(firstServer, secondServer);
+            var firstClientPassword = "firstClientPassword";
+            var firstClientResetEvent = new ManualResetEvent(false);
+            var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
+            firstClient.hostConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                firstClientResetEvent.Set();
+            });
+            firstClient.clientConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                firstClientResetEvent.Set();
+            });
+            firstClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
+                firstClientResetEvent.Set();
+            });
+
+            var secondClient = await SetupConnectionsForBothServersAsync(secondServer, firstServer);
+            var secondClientPassword = "secondClientPassword";
+            var secondClientResetEvent = new ManualResetEvent(false);
+            var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
+            secondClient.clientConnection.On<bool>("ReceiveSendReceiverPublicKey", (b) =>
+            {
+                secondClientResetEvent.Set();
+            });
+            secondClient.hostConnection.On("ReceiveSendEncryptedSessionKey", () =>
+            {
+                secondClientResetEvent.Set();
+            });
+
+
+            // Act
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            var response = await firstClient.httpClient.GetAsync("api/exchange/key");
+            var sessionKeyEncryptedWithPublicKey = await response.Content.ReadAsStringAsync();
+
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendEncryptedSessionKey),
+                sessionKeyEncryptedWithPublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            await using var file1 = new MemoryStream(originalBytes);
+            using var content1 = new StreamContent(file1);
+            using var formData = new MultipartFormDataContent();
+            formData.Add(content1, "files", "name");
+            formData.Add(new StringContent(cipherMode.ToString()), "mode");
+
+            response = await secondClient.httpClient.PostAsync("api/exchange/packageFile", formData);
+            var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile), packages.Select(p => p.Id).ToList(),
+            packages.Count, cipherMode, 128);
+            foreach (var package in packages)
+            {
+                await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), package);
+            }
+
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileName);
+            firstClientResetEvent.WaitOne();
+
+            // Assert
+            var receivedBytes = fileManager.GetFile(receivedFileName);
+            receivedFileName.Should().Be(fileName);
+            receivedBytes.Should().Equal(originalBytes);
 
         }
 
