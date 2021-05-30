@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -612,7 +613,7 @@ namespace FileExchanger.IntegrationTests
             {
                 secondClientResetEvent.Set();
             });
-            
+
 
             // Act
             await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
@@ -1254,7 +1255,7 @@ namespace FileExchanger.IntegrationTests
             {
                 secondClientResetEvent.Set();
             });
-            
+
 
             // Act
             await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey), secondClientLoginResponse.PublicKey);
@@ -1673,6 +1674,250 @@ namespace FileExchanger.IntegrationTests
             var receivedBytes = fileManager.GetFile(receivedFileName);
             receivedFileName.Should().Be(fileName);
             receivedBytes.Should().Equal(originalBytes);
+        }
+
+        [Theory]
+        [InlineData(CipherMode.ECB)]
+        [InlineData(CipherMode.CBC)]
+        [InlineData(CipherMode.CFB)]
+        [InlineData(CipherMode.OFB)]
+        public async Task MessagesAndFilesExchange_WhenClientsExchangedKeys_BothClientsShouldReceiveMessagesAndFiles(CipherMode cipherMode)
+        {
+            // Arrange
+            var receivedFileName = string.Empty;
+            var fileName = "testFile";
+            var message =
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam vitae metus eget sapien vulputate fermentum et ac tellus. Donec erat quam, bibendum eget consequat sit amet, egestas ut urna. Praesent felis nunc, fermentum id turpis vitae, congue sagittis erat. Duis iaculis urna non volutpat auctor. Maecenas a sapien varius, auctor ipsum quis, interdum elit. Nunc luctus ornare orci, ac porttitor magna ornare id. Vivamus pretium cursus velit eget vulputate. Vestibulum tellus sem, fringilla non pharetra ac, egestas a nisl. Nunc vitae lectus orci. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec mattis, ex ut porta ultricies, nisl arcu vehicula magna, eu laoreet elit elit auctor leo. Mauris eu blandit nunc. Proin hendrerit efficitur mattis. Proin blandit faucibus erat eu dictum. Nunc nec tortor pretium, auctor urna at, ullamcorper enim.\r\n\r\nVestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Etiam semper, augue et gravida maximus, tellus tellus tempus sem, hendrerit in.";
+            message = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(1023).ToArray());
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            Func<int, string> generateMessage = (length) =>
+            {
+                return new string(Enumerable.Repeat(chars, length)
+                    .Select(s => s[random.Next(s.Length)]).ToArray());
+            };
+            var messages = new List<string>
+            {
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(0).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(1).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(10).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(15).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(23).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(54).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(72).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(80).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(111).ToArray()),
+                Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(727).ToArray()),
+                generateMessage(1024 * 512),
+                generateMessage(1024 * 1024),
+                generateMessage(1024 * 1024 * 3)
+            };
+
+            var files = new List<byte[]>();
+            var fileNames = new List<string>();
+            var bytes = new byte[0];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[1];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[2];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[15];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[16];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[126];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[512];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[1024];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[1024 * 1024];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+            bytes = new byte[(int)(1024 * 1024 * 1.5)];
+            random.NextBytes(bytes);
+            files.Add(bytes);
+
+            for (var i = 0; i < files.Count; i++)
+            {
+                fileNames.Add($"{fileName}{i}.txt");
+            }
+
+            var receivedMessage = string.Empty;
+            var firstServer = BuildTestServer(clientName: "firstServer");
+            _firstServer = firstServer;
+            var secondServer =
+                BuildTestServer(builder => { builder.UseUrls("http://localhost:24555", "https://localhost:24556"); },
+                    "secondServer");
+            _secondServer = secondServer;
+
+            var firstReceivedMessages = new List<string>();
+            var firstReceivedFiles = new List<byte[]>();
+            var firstReceivedFileNames = new List<string>();
+            var firstFileManager = firstServer.Services.GetRequiredService<IFileManager>();
+            var firstClient = await SetupConnectionsForBothServersAsync(firstServer, secondServer);
+            var firstClientPassword = "firstClientPassword";
+            var firstClientResetEvent = new ManualResetEvent(false);
+            var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
+            firstClient.hostConnection.On<bool>("ReceiveSendReceiverPublicKey",
+                (b) => { firstClientResetEvent.Set(); });
+            firstClient.clientConnection.On("ReceiveSendEncryptedSessionKey", () => { firstClientResetEvent.Set(); });
+            firstClient.hostConnection.On<string>("ReceiveStopSendingMessage", (msg) =>
+            {
+                receivedMessage = msg;
+                firstClientResetEvent.Set();
+            });
+            firstClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
+                firstClientResetEvent.Set();
+            });
+
+            var secondReceivedMessages = new List<string>();
+            var secondReceivedFiles = new List<byte[]>();
+            var secondReceivedFileNames = new List<string>();
+            var secondFileManager = secondServer.Services.GetRequiredService<IFileManager>();
+            var secondClient = await SetupConnectionsForBothServersAsync(secondServer, firstServer);
+            var secondClientPassword = "secondClientPassword";
+            var secondClientResetEvent = new ManualResetEvent(false);
+            var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
+            secondClient.clientConnection.On<bool>("ReceiveSendReceiverPublicKey",
+                (b) => { secondClientResetEvent.Set(); });
+            secondClient.hostConnection.On("ReceiveSendEncryptedSessionKey", () => { secondClientResetEvent.Set(); });
+            secondClient.hostConnection.On<string>("ReceiveStopSendingMessage", (msg) =>
+            {
+                receivedMessage = msg;
+                secondClientResetEvent.Set();
+            });
+            secondClient.hostConnection.On<string>("ReceiveStopSendingFile", (fileName) =>
+            {
+                receivedFileName = fileName;
+                secondClientResetEvent.Set();
+            });
+
+            // Act
+            await secondClient.clientConnection.InvokeAsync(nameof(MessageHub.SendReceiverPublicKey),
+                secondClientLoginResponse.PublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            var response = await firstClient.httpClient.GetAsync("api/exchange/key");
+            var sessionKeyEncryptedWithPublicKey = await response.Content.ReadAsStringAsync();
+
+            await firstClient.clientConnection.InvokeAsync(nameof(MessageHub.SendEncryptedSessionKey),
+                sessionKeyEncryptedWithPublicKey);
+            secondClientResetEvent.WaitOne();
+            firstClientResetEvent.WaitOne();
+            secondClientResetEvent.Reset();
+            firstClientResetEvent.Reset();
+
+            for (var i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+                (HttpClient httpClient, HubConnection hostConnection, HubConnection clientConnection) sender;
+                List<string> receiverReceivedMessages;
+                ManualResetEvent receiverResetEvent;
+                if (i % 2 == 0)
+                {
+                    sender = firstClient;
+                    receiverResetEvent = secondClientResetEvent;
+                    receiverReceivedMessages = secondReceivedMessages;
+                }
+                else
+                {
+                    sender = secondClient;
+                    receiverResetEvent = firstClientResetEvent;
+                    receiverReceivedMessages = firstReceivedMessages;
+                }
+                response = await sender.httpClient.PostAsJsonAsync<PackageTextRequest>("api/exchange/packageText",
+                    new PackageTextRequest
+                    {
+                        Text = msg,
+                        Mode = cipherMode
+                    });
+                var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
+
+                await sender.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingMessage),
+                    packages.Select(p => p.Id).ToList(),
+                    packages.Count, cipherMode, 128);
+                foreach (var package in packages)
+                {
+                    await sender.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), package);
+                }
+
+                await sender.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingMessage));
+                receiverResetEvent.WaitOne();
+                receiverResetEvent.Reset();
+                receiverReceivedMessages.Add(receivedMessage);
+            }
+
+            for (var i = 0; i < files.Count; i++)
+            {
+                var file = files[i];
+                (HttpClient httpClient, HubConnection hostConnection, HubConnection clientConnection) sender;
+                ManualResetEvent receiverResetEvent;
+                List<byte[]> receiverReceivedFiles;
+                List<string> receiverReceivedFileNames;
+                IFileManager receiverFileManager;
+                if (i % 2 == 0)
+                {
+                    sender = firstClient;
+                    receiverResetEvent = secondClientResetEvent;
+                    receiverReceivedFiles = secondReceivedFiles;
+                    receiverReceivedFileNames = secondReceivedFileNames;
+                    receiverFileManager = secondFileManager;
+                }
+                else
+                {
+                    sender = secondClient;
+                    receiverResetEvent = firstClientResetEvent;
+                    receiverReceivedFiles = firstReceivedFiles;
+                    receiverReceivedFileNames = firstReceivedFileNames;
+                    receiverFileManager = firstFileManager;
+                }
+                await using var file1 = new MemoryStream(file);
+                using var content1 = new StreamContent(file1);
+                using var formData = new MultipartFormDataContent();
+                formData.Add(content1, "files", "name");
+                formData.Add(new StringContent(cipherMode.ToString()), "mode");
+
+                response = await sender.httpClient.PostAsync("api/exchange/packageFile", formData);
+                var packages = await response.Content.ReadFromJsonAsync<List<Package>>();
+
+                await sender.clientConnection.InvokeAsync(nameof(MessageHub.StartSendingFile),
+                    packages.Select(p => p.Id).ToList(),
+                    packages.Count, cipherMode, 128);
+                foreach (var package in packages)
+                {
+                    await sender.clientConnection.InvokeAsync(nameof(MessageHub.SendPackage), package);
+                }
+
+                await sender.clientConnection.InvokeAsync(nameof(MessageHub.StopSendingFile), fileNames[i]);
+                receiverResetEvent.WaitOne();
+                receiverResetEvent.Reset();
+                receiverReceivedFiles.Add(receiverFileManager.GetFile(receivedFileName));
+                receiverReceivedFileNames.Add(receivedFileName);
+            }
+
+            // Assert
+            firstReceivedMessages.Should().Equal(messages.Where((m, i) => i % 2 == 1));
+            secondReceivedMessages.Should().Equal(messages.Where((m, i) => i % 2 == 0));
+
+            firstReceivedFiles.Should().BeEquivalentTo(files.Where((m, i) => i % 2 == 1));
+            firstReceivedFileNames.Should().Equal(fileNames.Where((n, i) => i % 2 == 1));
+
+            secondReceivedFiles.Should().BeEquivalentTo(files.Where((m, i) => i % 2 == 0));
+            secondReceivedFileNames.Should().Equal(fileNames.Where((n, i) => i % 2 == 0));
 
         }
 
