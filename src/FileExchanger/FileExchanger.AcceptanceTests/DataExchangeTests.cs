@@ -162,6 +162,7 @@ namespace FileExchanger.AcceptanceTests
         [InlineData(CipherMode.CBC, 1024 * 1024 * 100)]
         [InlineData(CipherMode.CFB, 1024 * 1024 * 100)]
         [InlineData(CipherMode.OFB, 1024 * 1024 * 100)]
+        [InlineData(CipherMode.ECB, 1024 * 1024 * 101)]
         public async Task SendingFile_WhenClientsExchangedKeys_FirstClientShouldReceiveCorrectFile(CipherMode cipherMode, int sizeInBytes)
         {
             // Arrange
