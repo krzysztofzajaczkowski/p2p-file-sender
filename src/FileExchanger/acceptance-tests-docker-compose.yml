@@ -1,0 +1,17 @@
+version: '3.5'
+services:
+
+  api1:
+    build: ./
+    environment:
+      - RUN_ELECTRON=0
+    ports:
+      - 8005:8001
+      - 8006:80
+  api2:
+    build: ./
+    environment:
+      - RUN_ELECTRON=0
+    ports:
+      - 8007:8001
+      - 8008:80
