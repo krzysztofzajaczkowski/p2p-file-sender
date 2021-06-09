@@ -70,7 +70,10 @@ namespace FileExchanger
                 options.MaxRequestBodySize = int.MaxValue;
             });
 
-            services.AddNodeServices();
+            services.AddNodeServices(options =>
+            {
+                options.InvocationTimeoutMilliseconds = 1000 * 120;
+            });
 
             services.AddSingleton<JavaScriptInteropService>();
 
