@@ -24,13 +24,13 @@ namespace FileExchanger.AcceptanceTests
 {
     public class DockerTestsBase
     {
-        private readonly ITestOutputHelper _testOutputHelper;
-        private readonly ICompositeService _compositeService;
+        protected ITestOutputHelper TestOutputHelper { get; }
+        protected ICompositeService CompositeService { get; }
         private readonly string _dirSeparator;
 
         public DockerTestsBase(ITestOutputHelper testOutputHelper)
         {
-            _testOutputHelper = testOutputHelper;
+            TestOutputHelper = testOutputHelper;
             _dirSeparator = string.Empty;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
@@ -45,7 +45,7 @@ namespace FileExchanger.AcceptanceTests
             var projectPath = $"{solutionPath}{_dirSeparator}FileExchanger";
 
             var composePath = $"{solutionPath}{_dirSeparator}acceptance-tests-docker-compose.yml";
-            _compositeService = new Builder()
+            CompositeService = new Builder()
                 .UseContainer()
                 .UseCompose()
                 .FromFile(composePath)
@@ -114,8 +114,8 @@ namespace FileExchanger.AcceptanceTests
 
         public void Dispose()
         {
-            _compositeService.Stop();
-            _compositeService.Dispose();
+            CompositeService.Stop();
+            CompositeService.Dispose();
         }
     }
 }
