@@ -12,7 +12,7 @@ RUN dotnet publish ./FileExchanger -c Release -o out
 
 FROM mcr.microsoft.com/dotnet/aspnet:5.0
 WORKDIR /home
-COPY --from=build-env /app/out .
 RUN apt-get update -yq
 RUN apt-get install nodejs -yq
+COPY --from=build-env /app/out .
 ENTRYPOINT dotnet FileExchanger.dll
