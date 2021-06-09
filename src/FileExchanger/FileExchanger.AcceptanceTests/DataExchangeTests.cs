@@ -61,7 +61,6 @@ namespace FileExchanger.AcceptanceTests
             message = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(message).Take(1023).ToArray());
             var receivedMessage = string.Empty;
 
-            //var firstClient = await SetupConnectionForBothServers("localhost:8006", "localhost:8008");
             var firstClient = _firstClient;
             var firstClientPassword = "firstClientPassword";
             var firstClientResetEvent = new ManualResetEvent(false);
@@ -75,7 +74,6 @@ namespace FileExchanger.AcceptanceTests
                 firstClientResetEvent.Set();
             });
 
-            //var secondClient = await SetupConnectionForBothServers("localhost:8008", "localhost:8006");
             var secondClient = _secondClient;
             var secondClientPassword = "secondClientPassword";
             var secondClientResetEvent = new ManualResetEvent(false);
@@ -167,13 +165,14 @@ namespace FileExchanger.AcceptanceTests
         public async Task SendingFile_WhenClientsExchangedKeys_FirstClientShouldReceiveCorrectFile(CipherMode cipherMode, int sizeInBytes)
         {
             // Arrange
+            await _clientsBootstrapTask;
             var stopwatch = new Stopwatch();
             var originalBytes = new byte[sizeInBytes];
             new Random().NextBytes(originalBytes);
             var fileName = "testFile.test";
             var receivedFileName = string.Empty;
 
-            var firstClient = await SetupConnectionForBothServers("localhost:8006", "localhost:8008");// await SetupConnectionsForBothServersAsync(firstServer, secondServer);
+            var firstClient = _firstClient;
             var firstClientPassword = "firstClientPassword";
             var firstClientResetEvent = new ManualResetEvent(false);
             var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
@@ -191,7 +190,7 @@ namespace FileExchanger.AcceptanceTests
                 firstClientResetEvent.Set();
             });
 
-            var secondClient = await SetupConnectionForBothServers("localhost:8008", "localhost:8006");
+            var secondClient = _secondClient;
             var secondClientPassword = "secondClientPassword";
             var secondClientResetEvent = new ManualResetEvent(false);
             var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
@@ -275,6 +274,7 @@ namespace FileExchanger.AcceptanceTests
         public async Task MessagesAndFilesExchange_WhenClientsExchangedKeys_BothClientsShouldReceiveMessagesAndFiles(CipherMode cipherMode, int[] messageSizesInBytes, int[] fileSizesInBytes)
         {
             // Arrange
+            await _clientsBootstrapTask;
             var receivedFileName = string.Empty;
             var fileName = "testFile";
             var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -305,7 +305,7 @@ namespace FileExchanger.AcceptanceTests
             var firstReceivedMessages = new List<string>();
             var firstReceivedFiles = new List<byte[]>();
             var firstReceivedFileNames = new List<string>();
-            var firstClient = await SetupConnectionForBothServers("localhost:8006", "localhost:8008");
+            var firstClient = _firstClient;
             var firstClientPassword = "firstClientPassword";
             var firstClientResetEvent = new ManualResetEvent(false);
             var firstClientLoginResponse = await LoginClientAsync(firstClient.httpClient, firstClientPassword);
@@ -326,7 +326,7 @@ namespace FileExchanger.AcceptanceTests
             var secondReceivedMessages = new List<string>();
             var secondReceivedFiles = new List<byte[]>();
             var secondReceivedFileNames = new List<string>();
-            var secondClient = await SetupConnectionForBothServers("localhost:8008", "localhost:8006");
+            var secondClient = _secondClient;
             var secondClientPassword = "secondClientPassword";
             var secondClientResetEvent = new ManualResetEvent(false);
             var secondClientLoginResponse = await LoginClientAsync(secondClient.httpClient, secondClientPassword);
