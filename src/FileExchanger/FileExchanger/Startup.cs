@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.SpaServices.AngularCli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +50,7 @@ namespace FileExchanger
             {
                 o.EnableDetailedErrors = true;
                 o.MaximumReceiveMessageSize = null;
+                o.ClientTimeoutInterval = TimeSpan.FromMinutes(2);
             });
 
             services.Configure<FormOptions>(o =>
@@ -55,6 +58,16 @@ namespace FileExchanger
                 o.ValueLengthLimit = int.MaxValue;
                 o.MultipartBodyLengthLimit = int.MaxValue;
                 o.MemoryBufferThreshold = int.MaxValue;
+            });
+
+            services.Configure<KestrelServerOptions>(options =>
+            {
+                options.Limits.MaxRequestBodySize = int.MaxValue;
+            });
+
+            services.Configure<IISServerOptions>(options =>
+            {
+                options.MaxRequestBodySize = int.MaxValue;
             });
 
             services.AddNodeServices();
@@ -73,7 +86,10 @@ namespace FileExchanger
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            ElectronBootstrap();
+            if (Environment.GetEnvironmentVariable("RUN_ELECTRON") == "1" || Environment.GetEnvironmentVariable("RUN_ELECTRON") == null)
+            {
+                ElectronBootstrap();
+            }
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -83,11 +99,11 @@ namespace FileExchanger
                 app.UseExceptionHandler("/Error");
             }
 
-            //app.UseStaticFiles();
-            //if (!env.IsDevelopment())
-            //{
-            //    app.UseSpaStaticFiles();
-            //}
+            app.UseStaticFiles();
+            if (!env.IsDevelopment())
+            {
+                app.UseSpaStaticFiles();
+            }
 
             app.UseRouting();
 
