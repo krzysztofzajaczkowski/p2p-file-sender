@@ -26,7 +26,7 @@ export class ReceiverComponent implements OnInit, OnDestroy {
     this.replyWith = this.receivingFile ? '/file-sender' : '/message-sender';
   }
 
-  ngOnDestroy() : void {
+  ngOnDestroy(): void {
   }
 
   reply() {

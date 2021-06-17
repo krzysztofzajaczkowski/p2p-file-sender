@@ -20,6 +20,7 @@ import {MessageSenderComponent} from './message-sender/message-sender.component'
 import {MenuComponent} from './menu/menu.component';
 import {ReceiverComponent} from './receiver/receiver.component';
 import {SubscriptionService} from './services/subscription.service';
+import {ChooserComponent} from './chooser/chooser.component';
 
 @NgModule({
   declarations: [
@@ -28,7 +29,8 @@ import {SubscriptionService} from './services/subscription.service';
     FileSenderComponent,
     MessageSenderComponent,
     MenuComponent,
-    ReceiverComponent
+    ReceiverComponent,
+    ChooserComponent
   ],
   imports: [
     BrowserModule.withServerTransition({appId: 'ng-cli-universal'}),
@@ -51,6 +53,9 @@ import {SubscriptionService} from './services/subscription.service';
   ],
   providers: [SubscriptionService],
   bootstrap: [AppComponent],
-  entryComponents: [ReceiverComponent]
+  entryComponents: [
+    ReceiverComponent,
+    ChooserComponent
+  ]
 })
 export class AppModule { }
