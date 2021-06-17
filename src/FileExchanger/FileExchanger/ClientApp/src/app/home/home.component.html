@@ -8,6 +8,6 @@
         name="login"
         placeholder="password"
       />
-      <input type="submit" value="Log In" (click)="login()"/>
+      <button mat-raised-button color="warn" (click)="login()" [disabled]="!!password">Log in</button>
     </form>
   </div>

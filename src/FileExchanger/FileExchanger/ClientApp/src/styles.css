@@ -42,23 +42,18 @@ h3 {
   margin: 0 5%;
   background: #fff;
   width: 90%;
-  max-width: 450px;
+  min-width: 300px;
   position: relative;
   padding: 0 0 10px;
   box-shadow: 0 30px 60px 0 rgba(0, 0, 0, 0.3);
   text-align: center;
 }
 
-input[type="button"],
-input[type="submit"]{
-  background-color: #ee5253;
+.button {
   border: none;
-  color: white;
-  padding: 15px 80px;
   text-align: center;
   display: inline-block;
   text-transform: uppercase;
-  font-size: 13px;
   box-shadow: 0 10px 30px 0 hsla(0, 76%, 64%, 0.4);
   border-radius: 5px 5px 5px 5px;
   margin: 5px 20px 20px 20px;
@@ -76,13 +71,12 @@ input[type="file"] {
   margin: 5px 20px 5px 20px;
 }
 
-input[type="button"]:active,
-input[type="submit"]:active,
-input[type="file"]:active {
+input[type="file"]:active,
+button:active {
   transform: scale(0.9);
 }
 
-input[type="button"]:disabled{
+button:disabled {
   background-color: rgba(238, 82, 83, 0.2);
 }
 
@@ -109,6 +103,4 @@ mat-progress-bar {
   margin-bottom: 20px;
 }
 
-* {
-  box-sizing: border-box;
-}
+/*s*/

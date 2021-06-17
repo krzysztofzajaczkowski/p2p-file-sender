@@ -1,7 +1,6 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
-import {Router} from '@angular/router';
 import {interval, Subscription} from 'rxjs';
-import {map} from 'rxjs/operators';
+import {take} from 'rxjs/operators';
 
 @Component({
   selector: 'app-message-sender',
@@ -9,21 +8,34 @@ import {map} from 'rxjs/operators';
 })
 export class MessageSenderComponent implements OnInit, OnDestroy {
   private encodings: string[] = ['ECB', 'CBC', 'CFB', 'OFB'];
-  public progress = 0;
   private obs: Subscription;
+  message: string;
+  progress = 0;
+  chosenEncoding: string;
 
-  constructor(private router: Router ) {
+  constructor() {
   }
 
   ngOnInit(): void {
-    this.obs = interval(100).pipe(map(x => x % 101)).subscribe(progress => this.progress = progress );
   }
 
-  ngOnDestroy() {
-    this.obs.unsubscribe();
+  ngOnDestroy(): void {
+    if (this.obs) {
+      this.obs.unsubscribe();
+    }
   }
 
   getEncodings(): string[] {
     return this.encodings;
+  }
+
+  sendMessage() {
+    this.obs = interval(200).pipe(take(101)).subscribe({
+      next: progress => this.progress = progress
+    });
+  }
+
+  get senderDisabled(): boolean {
+    return !this.message || this.message === '' || !this.chosenEncoding;
   }
 }

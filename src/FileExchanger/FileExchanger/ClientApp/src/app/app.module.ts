@@ -7,11 +7,20 @@ import { RouterModule } from '@angular/router';
 import { AppComponent } from './app.component';
 import { HomeComponent } from './home/home.component';
 import { CounterComponent } from './counter/counter.component';
-import {MatProgressBarModule, MatSnackBarModule} from '@angular/material';
+import {
+  MatButtonModule,
+  MatDialogModule,
+  MatFormFieldModule,
+  MatInputModule,
+  MatProgressBarModule, MatRadioModule,
+  MatSnackBarModule
+} from '@angular/material';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
 import {FileSenderComponent} from './file-sender/file-sender.component';
 import {MessageSenderComponent} from './message-sender/message-sender.component';
 import {MenuComponent} from './menu/menu.component';
+import {ReceiverComponent} from './receiver/receiver.component';
+import {SubscriptionService} from './services/subscription.service';
 
 @NgModule({
   declarations: [
@@ -20,13 +29,15 @@ import {MenuComponent} from './menu/menu.component';
     CounterComponent,
     FileSenderComponent,
     MessageSenderComponent,
-    MenuComponent
+    MenuComponent,
+    ReceiverComponent
   ],
   imports: [
     BrowserModule.withServerTransition({appId: 'ng-cli-universal'}),
     HttpClientModule,
     FormsModule,
     MatSnackBarModule,
+    MatDialogModule,
     BrowserAnimationsModule,
     RouterModule.forRoot([
       {path: '', component: HomeComponent, pathMatch: 'full'},
@@ -35,9 +46,14 @@ import {MenuComponent} from './menu/menu.component';
       {path: 'message-sender', component: MessageSenderComponent},
       {path: 'menu', component: MenuComponent}
     ]),
-    MatProgressBarModule
+    MatProgressBarModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatRadioModule
   ],
-  providers: [],
-  bootstrap: [AppComponent]
+  providers: [SubscriptionService],
+  bootstrap: [AppComponent],
+  entryComponents: [ReceiverComponent]
 })
 export class AppModule { }

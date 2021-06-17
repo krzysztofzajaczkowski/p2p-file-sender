@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 import {Router} from '@angular/router';
 import {MatSnackBar} from '@angular/material/snack-bar';
 
@@ -6,14 +6,24 @@ import {MatSnackBar} from '@angular/material/snack-bar';
   selector: 'app-home',
   templateUrl: './menu.component.html'
 })
-export class MenuComponent {
-  constructor(private router: Router, private _snackBar: MatSnackBar ) {
+export class MenuComponent implements OnInit, OnDestroy {
+  sessionKeyGenerated: boolean;
+
+  constructor(private router: Router, private snackBar: MatSnackBar) {
   }
 
-
   generateSessionKey() {
-    this._snackBar.open('Session key generated!', null, {
+    console.log(Date.now());
+    this.snackBar.open('Session key generated!', null, {
       duration: 2000
     });
+    this.sessionKeyGenerated = true;
+  }
+
+  ngOnInit(): void {
+    this.sessionKeyGenerated = false;
+  }
+
+  ngOnDestroy(): void {
   }
 }

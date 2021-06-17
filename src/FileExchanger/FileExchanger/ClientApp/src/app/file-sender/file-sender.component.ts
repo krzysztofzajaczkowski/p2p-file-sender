@@ -1,7 +1,7 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {Router} from '@angular/router';
 import {interval, Subscription} from 'rxjs';
-import {map} from 'rxjs/operators';
+import {take} from 'rxjs/operators';
 
 @Component({
   selector: 'app-file-sender',
@@ -9,21 +9,39 @@ import {map} from 'rxjs/operators';
 })
 export class FileSenderComponent implements OnInit, OnDestroy {
   private encodings: string[] = ['ECB', 'CBC', 'CFB', 'OFB'];
-  public progress = 0;
   private obs: Subscription;
+  private sending: boolean;
+  file: File;
+  progress: number;
+  chosenEncoding: string;
 
   constructor(private router: Router ) {
   }
 
   ngOnInit(): void {
-    this.obs = interval(250).pipe(map(x => x % 101)).subscribe(progress => this.progress = progress );
+    this.progress = 0;
+    this.sending = false;
   }
 
-  ngOnDestroy() {
-    this.obs.unsubscribe();
+  ngOnDestroy(): void {
+    if (this.obs) {
+      this.obs.unsubscribe();
+    }
   }
 
   getEncodings(): string[] {
     return this.encodings;
+  }
+
+  sendMessage() {
+    this.sending = true;
+    this.obs = interval(200).pipe(take(101)).subscribe({
+      next: progress => this.progress = progress,
+      complete: () => this.sending = false
+    });
+  }
+
+  get senderDisabled(): boolean {
+    return !this.file || !this.chosenEncoding || this.sending;
   }
 }
