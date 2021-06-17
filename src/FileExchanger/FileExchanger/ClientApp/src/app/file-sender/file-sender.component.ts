@@ -1,5 +1,4 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
-import {Router} from '@angular/router';
 import {interval, Subscription} from 'rxjs';
 import {take} from 'rxjs/operators';
 
@@ -15,7 +14,7 @@ export class FileSenderComponent implements OnInit, OnDestroy {
   progress: number;
   chosenEncoding: string;
 
-  constructor(private router: Router ) {
+  constructor() {
   }
 
   ngOnInit(): void {

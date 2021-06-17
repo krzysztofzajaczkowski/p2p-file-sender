@@ -6,7 +6,6 @@ import { RouterModule } from '@angular/router';
 
 import { AppComponent } from './app.component';
 import { HomeComponent } from './home/home.component';
-import { CounterComponent } from './counter/counter.component';
 import {
   MatButtonModule,
   MatDialogModule,
@@ -26,7 +25,6 @@ import {SubscriptionService} from './services/subscription.service';
   declarations: [
     AppComponent,
     HomeComponent,
-    CounterComponent,
     FileSenderComponent,
     MessageSenderComponent,
     MenuComponent,
@@ -41,7 +39,6 @@ import {SubscriptionService} from './services/subscription.service';
     BrowserAnimationsModule,
     RouterModule.forRoot([
       {path: '', component: HomeComponent, pathMatch: 'full'},
-      {path: 'counter', component: CounterComponent},
       {path: 'file-sender', component: FileSenderComponent},
       {path: 'message-sender', component: MessageSenderComponent},
       {path: 'menu', component: MenuComponent}
