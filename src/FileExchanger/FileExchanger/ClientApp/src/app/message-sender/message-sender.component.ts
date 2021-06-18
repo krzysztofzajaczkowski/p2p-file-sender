@@ -30,7 +30,7 @@ export class MessageSenderComponent implements OnInit, OnDestroy {
   }
 
   sendMessage() {
-    this.obs = interval(200).pipe(take(101)).subscribe({
+    this.obs = interval(100).pipe(take(101)).subscribe({
       next: progress => this.progress = progress
     });
   }
