@@ -27,6 +27,11 @@ namespace FileExchanger.Services.Encryptor
         private CipherMode _currentDataCipherMode;
         private int _currentDataBlockSize;
 
+        public CipherMode CurrentDataCipherMode => _currentDataCipherMode;
+        public List<byte> SessionKey => _sessionKey;
+        public List<byte> PrivateKey => _privateKey;
+        public byte[] PublicKey => _publicKey;
+
         public EncryptorService(IKeyStore keyStore, IDummyDataService dummyDataService, JavaScriptInteropService javaScriptInteropService)
         {
             _keyStore = keyStore;
@@ -202,6 +207,9 @@ namespace FileExchanger.Services.Encryptor
 
         public byte[] GenerateSessionKey()
         {
+            var bytes = new byte[32];
+            new Random((int) (Environment.TickCount64 + Environment.ProcessorCount)).NextBytes(bytes);
+            return bytes;
             using var aesAlg = Aes.Create();
             aesAlg.GenerateKey();
             return aesAlg.Key;
@@ -268,6 +276,8 @@ namespace FileExchanger.Services.Encryptor
             {
                 decryptedPrivateKey = DecryptDataFromBase64(privateKeyBase64, hashedPasswordBytes);
                 decryptedPublicKey = DecryptDataFromBase64(publicKeyBase64, hashedPasswordBytes);
+                _publicKey = Convert.FromBase64String(decryptedPublicKey);
+                _privateKey = Convert.FromBase64String(decryptedPrivateKey).ToList();
             }
             catch (CryptographicException e)
             {

@@ -21,5 +21,11 @@ namespace FileExchanger.Services.Encryptor
         Task<List<Package>> GetEncryptedPackagesAsync(byte[] data, CipherMode cipherMode = CipherMode.CBC);
         Task<string> GetMessageFromPackagesAsync();
         Task<byte[]> GetBytesFromPackagesAsync();
+        CipherMode CurrentDataCipherMode { get; }
+        List<byte> SessionKey { get; }
+        List<byte> PrivateKey { get; }
+        byte[] PublicKey { get; }
+
+        (string hashedPassword, byte[] hashedPasswordBytes) HashPassword(string password);
     }
 }
