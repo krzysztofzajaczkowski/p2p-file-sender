@@ -1,0 +1,24 @@
+h2 {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  margin: 8px;
+  color: #0d0d0d;
+  border-bottom: 2px solid #ee5253;
+}
+
+button {
+  float: right;
+  color: #cccccc;
+}
+
+mat-dialog-actions {
+  display: block;
+}
+
+.content {
+  display: block;
+  margin: 8px;
+}

@@ -1,0 +1,20 @@
+<div class="main">
+  <h2>BSK Project</h2>
+  <form>
+    <h3>Write message</h3>
+    <br/>
+    <input type="text" [(ngModel)]="message" id="text" name="text"/>
+    <h3>Choose encoding</h3>
+    <br/>
+    <mat-radio-group [(ngModel)]="chosenEncoding" name="chosenEncoding">
+      <div *ngFor="let encoding of getEncodings()">
+        <mat-radio-button name="coding" value="{{encoding}}" id="{{encoding}}">{{encoding}}</mat-radio-button>
+      </div>
+    </mat-radio-group>
+    <br/>
+    <h3>Sending progress:</h3><br/>
+    <label for="progress">{{progress}}%</label>
+    <mat-progress-bar aria-labelledby="progress" color="warn" id="progress" value="{{progress}}"></mat-progress-bar>
+    <button mat-raised-button color="warn" value="Send file!" (click)="sendMessage()" [disabled]="senderDisabled">Send message!</button>
+  </form>
+</div>

@@ -1,0 +1,11 @@
+<div>
+  <h2>You received a {{receivingFile ? 'file' : 'message'}}!</h2>
+  <div class="content">
+    <p *ngIf="receivingFile; else receivingMessage">Received file: {{filename}}</p>
+    <mat-dialog-actions>
+      <button mat-raised-button color="warn" [routerLink]="replyWith" (click)="reply()">Reply</button>
+    </mat-dialog-actions>
+  </div>
+</div>
+
+<ng-template #receivingMessage>Received message: {{message}}</ng-template>

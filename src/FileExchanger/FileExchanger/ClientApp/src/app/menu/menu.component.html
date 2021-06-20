@@ -1,0 +1,15 @@
+<div class="main" xmlns="http://www.w3.org/1999/html">
+  <h2>BSK Project</h2><br/>
+  <div class="button">
+    <button mat-raised-button color="warn" [disabled]="!sessionKeyGenerated" [routerLink]="['/file-sender']">
+      Send file
+    </button>
+  </div><br/>
+  <div class="button">
+  <button mat-raised-button color="warn" [disabled]="!sessionKeyGenerated" [routerLink]="['/message-sender']">
+    Send message
+  </button></div><br/>
+  <div class="button"><button mat-raised-button color="warn" [disabled]="sessionKeyGenerated" (click)="generateSessionKey()">
+    Generate session key
+  </button></div><br/>
+</div>
